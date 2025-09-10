@@ -13,7 +13,7 @@
 
   <script>
     const video = document.getElementById("remoteVideo");
-    const socket = io("https://websocket-production-d07e.up.railway.app/");
+    const socket = io("https://websocket-production-d07e.up.railway.app");
     const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
     let pc = null;
     let inboundStream = new MediaStream(); // Stream que receberá todos os tracks
