@@ -66,6 +66,11 @@ io.on("connection", (socket) => {
     console.log("Cliente desconectou:", socket.id);
     socket.broadcast.emit("disconnectPeer", socket.id);
   });
+
+  socket.on("chatMessage", (msg) => {
+    io.emit("chatMessage", msg);
+  });
+
 });
 
 const PORT = process.env.PORT || 3000;
