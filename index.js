@@ -3,13 +3,34 @@ import http from "http";
 import { Server } from "socket.io";
 import path from "path";
 import { fileURLToPath } from "url";
+import cors from "cors";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// Lista de origens permitidas
+const allowedOrigins = [
+  "https://knowledgehub-nine.vercel.app",
+  "http://localhost:3000"
+];
+
+// Configuração de CORS para HTTP
+app.use(cors({
+  origin: allowedOrigins,
+  methods: ["GET", "POST"]
+}));
+
 const server = http.createServer(app);
-const io = new Server(server);
+
+// Configuração de CORS para WebSocket (socket.io)
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"]
+  }
+});
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -47,5 +68,5 @@ io.on("connection", (socket) => {
   });
 });
 
-const PORT = 3000;
-server.listen(PORT, () => console.log(`Servidor rodando em http://localhost:${PORT}`));
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
