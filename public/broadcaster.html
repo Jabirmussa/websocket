@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Broadcaster</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+  <h2>Broadcaster</h2>
+  <video id="localVideo" autoplay playsinline muted style="width:600px;background:#000"></video>
+
+  <script>
+    const video = document.getElementById("localVideo");
+    const socket = io();
+    const peerConnections = {}; // Armazena RTCPeerConnection de cada viewer
+    const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
+    async function startBroadcast() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        video.srcObject = stream;
+        console.log("Câmera capturada, emitindo broadcaster");
+        socket.emit("broadcaster");
+
+        // Quando um novo viewer se conecta
+        socket.on("watcher", async (id) => {
+          console.log("Novo viewer:", id);
+          const pc = new RTCPeerConnection(config);
+          peerConnections[id] = pc;
+
+          // Adiciona todos os tracks do broadcaster para o viewer
+          stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+          // Envia candidates ICE
+          pc.onicecandidate = (event) => {
+            if (event.candidate) {
+              console.log("Enviando candidate para viewer", id);
+              socket.emit("candidate", id, event.candidate);
+            }
+          };
+
+          // Cria offer e envia para o viewer
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          console.log("Enviando offer para viewer", id);
+          socket.emit("offer", id, pc.localDescription);
+        });
+
+        // Recebe answer de um viewer
+        socket.on("answer", (id, description) => {
+          console.log("Recebi answer do viewer", id);
+          const pc = peerConnections[id];
+          if (pc) pc.setRemoteDescription(description);
+        });
+
+        // Recebe candidate de um viewer
+        socket.on("candidate", (id, candidate) => {
+          const pc = peerConnections[id];
+          if (pc) {
+            console.log("Recebi candidate do viewer", id);
+            pc.addIceCandidate(new RTCIceCandidate(candidate));
+          }
+        });
+
+        // Se o viewer desconectar
+        socket.on("disconnectPeer", (id) => {
+          console.log("Viewer desconectou:", id);
+          const pc = peerConnections[id];
+          if (pc) {
+            pc.close();
+            delete peerConnections[id];
+          }
+        });
+
+      } catch (err) {
+        console.error("Erro getUserMedia:", err);
+      }
+    }
+
+    startBroadcast();
+  </script>
+</body>
+</html>

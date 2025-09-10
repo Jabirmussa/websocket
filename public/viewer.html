@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Viewer</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+  <h2>Viewer</h2>
+  <!-- Muted garante autoplay no Chrome -->
+  <video id="remoteVideo" autoplay playsinline muted style="width:600px;background:#000"></video>
+
+  <script>
+    const video = document.getElementById("remoteVideo");
+    const socket = io();
+    const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+    let pc = null;
+    let inboundStream = new MediaStream(); // Stream que receberá todos os tracks
+    video.srcObject = inboundStream;
+
+    socket.on("broadcaster", () => {
+      console.log("Broadcaster detectado, emitindo watcher");
+      socket.emit("watcher");
+    });
+
+    socket.on("offer", async (id, description) => {
+      console.log("Recebi offer do broadcaster", id);
+      pc = new RTCPeerConnection(config);
+
+      // Cada track que chegar é adicionada ao inboundStream
+      pc.ontrack = (event) => {
+        console.log("Recebi track de vídeo:", event.track.kind);
+        inboundStream.addTrack(event.track);
+      };
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          console.log("Enviando candidate para broadcaster");
+          socket.emit("candidate", id, event.candidate);
+        }
+      };
+
+      await pc.setRemoteDescription(description);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      console.log("Enviando answer para broadcaster");
+      socket.emit("answer", id, pc.localDescription);
+    });
+
+    socket.on("candidate", (id, candidate) => {
+      if (pc) {
+        console.log("Recebi candidate do broadcaster");
+        pc.addIceCandidate(new RTCIceCandidate(candidate));
+      }
+    });
+
+    socket.on("disconnectPeer", () => {
+      if (pc) pc.close();
+    });
+  </script>
+</body>
+</html>
