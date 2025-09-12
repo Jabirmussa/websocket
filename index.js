@@ -71,6 +71,11 @@ io.on("connection", (socket) => {
     io.emit("chatMessage", msg);
   });
 
+  socket.on("whiteboardUpdate", (data) => {
+    socket.broadcast.emit("whiteboardUpdate", data);
+  });
+
+
 });
 
 const PORT = process.env.PORT || 3000;
