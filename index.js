@@ -52,6 +52,11 @@ io.on("connection", (socket) => {
     io.to(id).emit("offer", socket.id, message);
   });
 
+  socket.on("joinRoom", (roomId) => {
+    socket.join(roomId);
+    console.log(`Socket ${socket.id} entrou na sala ${roomId}`);
+  });
+
   socket.on("answer", (id, message) => {
     console.log("Answer do viewer para broadcaster:", id);
     io.to(id).emit("answer", socket.id, message);
@@ -71,9 +76,10 @@ io.on("connection", (socket) => {
     io.emit("chatMessage", msg);
   });
 
-  socket.on("whiteboardUpdate", (data) => {
-    socket.broadcast.emit("whiteboardUpdate", data);
+  socket.on("whiteboardUpdate", ({ roomId, ...data }) => {
+    socket.to(roomId).emit("whiteboardUpdate", data);
   });
+
 
 
 });
