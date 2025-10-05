@@ -120,6 +120,17 @@ io.on("connection", (socket) => {
       }
     }
   });
+
+  // Quando mentor envia slides
+  socket.on('slidesUpdate', (data) => {
+    socket.to(data.roomId).emit('slidesUpdate', data);
+  });
+
+  // Quando mentor muda de slide
+  socket.on('slideChanged', (data) => {
+    socket.to(data.roomId).emit('slideChanged', data.slideIndex);
+  });
+  
 });
 
 const PORT = process.env.PORT || 3000;
