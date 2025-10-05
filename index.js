@@ -1,4 +1,3 @@
-
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
@@ -12,7 +11,6 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Lista de origens permitidas
 const allowedOrigins = [
   "https://knowledgehub-nine.vercel.app",
   "http://localhost:3000"
@@ -34,9 +32,6 @@ const io = new Server(server, {
 
 app.use(express.static(path.join(__dirname, "public")));
 
-// ============================
-// LiveKit: gerar token JWT
-// ============================
 app.get("/get-token", (req, res) => {
   const { roomName, participantName } = req.query;
 
@@ -56,30 +51,37 @@ app.get("/get-token", (req, res) => {
   res.json({ token });
 });
 
-// ============================
-// Armazenar informações das salas (chat + whiteboard)
-// ============================
 const rooms = new Map();
 
 io.on("connection", (socket) => {
   console.log("Cliente conectado:", socket.id);
 
-  // Entrar em uma sala
   socket.on("joinRoom", (roomId) => {
     socket.join(roomId);
     console.log(`Socket ${socket.id} entrou na sala ${roomId}`);
     
     if (!rooms.has(roomId)) {
-      rooms.set(roomId, { participants: new Set() });
+      rooms.set(roomId, { 
+        participants: new Set(),
+        slides: [],
+        currentSlide: 0,
+        showSlides: false
+      });
     }
     const room = rooms.get(roomId);
     room.participants.add(socket.id);
 
-    // Notificar outros participantes
+    if (room.showSlides && room.slides.length > 0) {
+      socket.emit("slidesUpdate", {
+        slides: room.slides,
+        currentSlide: room.currentSlide,
+        showSlides: room.showSlides
+      });
+    }
+
     socket.to(roomId).emit("newParticipant", socket.id);
   });
 
-  // Sair de uma sala
   socket.on("leaveRoom", (roomId) => {
     if (!roomId) return;
     socket.leave(roomId);
@@ -91,22 +93,51 @@ io.on("connection", (socket) => {
 
       if (room.participants.size === 0) {
         rooms.delete(roomId);
+        console.log(`Sala ${roomId} removida (sem participantes)`);
       }
     }
   });
 
-  // Chat
   socket.on("chatMessage", ({ roomId, ...msg }) => {
     console.log(`Mensagem de chat na sala ${roomId}:`, msg);
     io.to(roomId).emit("chatMessage", msg);
   });
 
-  // Quadro colaborativo
   socket.on("whiteboardUpdate", ({ roomId, ...data }) => {
     socket.to(roomId).emit("whiteboardUpdate", data);
   });
 
-  // Desconexão
+  socket.on('slidesUpdate', (data) => {
+    const { roomId, slides, currentSlide, showSlides } = data;
+    
+    const room = rooms.get(roomId);
+    if (room) {
+      room.slides = slides;
+      room.currentSlide = currentSlide;
+      room.showSlides = showSlides;
+      
+      console.log(`Slides atualizados na sala ${roomId}: ${slides.length} slides, mostrando: ${showSlides}`);
+    }
+    
+    io.to(roomId).emit('slidesUpdate', {
+      slides,
+      currentSlide,
+      showSlides
+    });
+  });
+
+  socket.on('slideChanged', (data) => {
+    const { roomId, slideIndex } = data;
+    
+    const room = rooms.get(roomId);
+    if (room) {
+      room.currentSlide = slideIndex;
+      console.log(`Slide mudado na sala ${roomId}: slide ${slideIndex}`);
+    }
+    
+    io.to(roomId).emit('slideChanged', slideIndex);
+  });
+
   socket.on("disconnect", () => {
     console.log("Cliente desconectou:", socket.id);
     for (const [roomId, room] of rooms.entries()) {
@@ -116,19 +147,10 @@ io.on("connection", (socket) => {
 
         if (room.participants.size === 0) {
           rooms.delete(roomId);
+          console.log(`Sala ${roomId} removida (último participante saiu)`);
         }
       }
     }
-  });
-
-  // Quando mentor envia slides
-  socket.on('slidesUpdate', (data) => {
-    socket.to(data.roomId).emit('slidesUpdate', data);
-  });
-
-  // Quando mentor muda de slide
-  socket.on('slideChanged', (data) => {
-    socket.to(data.roomId).emit('slideChanged', data.slideIndex);
   });
   
 });
