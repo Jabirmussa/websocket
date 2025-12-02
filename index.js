@@ -65,6 +65,19 @@ app.get("/get-token", (req, res) => {
 const rooms = new Map();
 const onlineUsers = new Map(); // userId -> socketId
 
+// === Função auxiliar para broadcast de status ===
+function broadcastUserStatus(userId, isOnline) {
+  io.emit("userStatus", { userId, isOnline });
+  console.log(`Status broadcast: ${userId} está ${isOnline ? "online" : "offline"}`);
+}
+
+// === Função para enviar lista de usuários online ===
+function sendOnlineUsersList(socket) {
+  const onlineUserIds = Array.from(onlineUsers.keys());
+  socket.emit("onlineUsers", onlineUserIds);
+  console.log(`Lista de usuários online enviada: ${onlineUserIds.length} usuários`);
+}
+
 io.on("connection", (socket) => {
   console.log("Cliente conectado:", socket.id);
 
@@ -72,6 +85,12 @@ io.on("connection", (socket) => {
   socket.on("registerUser", (userId) => {
     onlineUsers.set(userId, socket.id);
     console.log(`Usuário ${userId} registrado no socket ${socket.id}`);
+    
+    // Notificar todos sobre o novo usuário online
+    broadcastUserStatus(userId, true);
+    
+    // Enviar lista de usuários online para o novo usuário
+    sendOnlineUsersList(socket);
   });
 
   // === Entrar numa sala ===
@@ -198,16 +217,21 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log("Cliente desconectou:", socket.id);
 
-    // remove da lista de usuários online
+    // Remove da lista de usuários online e notifica todos
+    let disconnectedUserId = null;
     for (const [userId, sockId] of onlineUsers.entries()) {
       if (sockId === socket.id) {
+        disconnectedUserId = userId;
         onlineUsers.delete(userId);
         console.log(`Usuário ${userId} desconectado`);
+        
+        // Notificar todos que o usuário ficou offline
+        broadcastUserStatus(userId, false);
         break;
       }
     }
 
-    // remove de salas
+    // Remove de salas
     for (const [roomId, room] of rooms.entries()) {
       if (room.participants.has(socket.id)) {
         room.participants.delete(socket.id);
