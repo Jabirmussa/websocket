@@ -64,6 +64,7 @@ app.get("/get-token", (req, res) => {
 // === Estrutura principal ===
 const rooms = new Map();
 const onlineUsers = new Map(); // userId -> socketId
+const whiteboardStates = new Map(); // roomId -> whiteboard state
 
 // === Função auxiliar para broadcast de status ===
 function broadcastUserStatus(userId, isOnline) {
@@ -109,12 +110,19 @@ io.on("connection", (socket) => {
     const room = rooms.get(roomId);
     room.participants.add(socket.id);
 
+    // Enviar estado atual dos slides se houver
     if (room.showSlides && room.slides.length > 0) {
       socket.emit("slidesUpdate", {
         slides: room.slides,
         currentSlide: room.currentSlide,
         showSlides: room.showSlides,
       });
+    }
+
+    // Enviar estado atual do whiteboard se houver
+    const whiteboardState = whiteboardStates.get(roomId);
+    if (whiteboardState) {
+      socket.emit("whiteboardUpdate", whiteboardState);
     }
 
     socket.to(roomId).emit("newParticipant", socket.id);
@@ -132,6 +140,8 @@ io.on("connection", (socket) => {
 
       if (room.participants.size === 0) {
         rooms.delete(roomId);
+        // Limpar estado do whiteboard quando sala fica vazia
+        whiteboardStates.delete(roomId);
         console.log(`Sala ${roomId} removida (sem participantes)`);
       }
     }
@@ -175,9 +185,30 @@ io.on("connection", (socket) => {
     socket.emit("privateMessage", { senderId, message });
   });
 
-  // === WHITEBOARD ===
+  // === WHITEBOARD MELHORADO ===
+  
+  // Solicitar estado atual do whiteboard
+  socket.on("requestWhiteboardState", ({ roomId }) => {
+    console.log(`Solicitação de estado do whiteboard para sala ${roomId}`);
+    const state = whiteboardStates.get(roomId);
+    if (state) {
+      socket.emit("whiteboardUpdate", state);
+      console.log(`Estado do whiteboard enviado para ${socket.id}`);
+    }
+  });
+
+  // Atualizar estado do whiteboard
   socket.on("whiteboardUpdate", ({ roomId, ...data }) => {
+    // Salvar estado atual
+    whiteboardStates.set(roomId, {
+      ...data,
+      timestamp: Date.now()
+    });
+    
+    // Broadcast para outros participantes (exceto quem enviou)
     socket.to(roomId).emit("whiteboardUpdate", data);
+    
+    console.log(`Whiteboard atualizado na sala ${roomId} por ${socket.id}`);
   });
 
   // === SLIDES ===
@@ -190,7 +221,7 @@ io.on("connection", (socket) => {
       room.currentSlide = currentSlide;
       room.showSlides = showSlides;
       console.log(
-        `Slides atualizados na sala ${roomId}: ${slides.length} slides, mostrando: ${showSlides}`
+        `Slides atualizados na sala ${roomId}: ${slides.length} slides, mostrando: ${showSlides}` 
       );
     }
 
@@ -231,7 +262,7 @@ io.on("connection", (socket) => {
       }
     }
 
-    // Remove de salas
+    // Remove de salas e limpa estados se necessário
     for (const [roomId, room] of rooms.entries()) {
       if (room.participants.has(socket.id)) {
         room.participants.delete(socket.id);
@@ -239,6 +270,7 @@ io.on("connection", (socket) => {
 
         if (room.participants.size === 0) {
           rooms.delete(roomId);
+          whiteboardStates.delete(roomId); // Limpar whiteboard state
           console.log(`Sala ${roomId} removida (último participante saiu)`);
         }
       }
@@ -250,4 +282,5 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
   console.log("CORS configurado para:", allowedOrigins);
+  console.log("Sistema de whiteboard melhorado ativado");
 });
