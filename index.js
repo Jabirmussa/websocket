@@ -245,9 +245,17 @@ io.on("connection", (socket) => {
   });
 
   // === PDF Annotations ===
+  // socket.on("pdfAnnotation", (data) => {
+  //   console.log(`PDF annotation recebida de ${socket.id} na sala ${data.roomId}:`, data);
+  //   socket.to(data.roomId).emit("pdfAnnotation", data);
+  // });
+
   socket.on("pdfAnnotation", (data) => {
     console.log(`PDF annotation recebida de ${socket.id} na sala ${data.roomId}:`, data);
+    const roomParticipants = rooms.get(data.roomId);
+    console.log(`Participantes na sala ${data.roomId}:`, roomParticipants ? Array.from(roomParticipants) : 'nenhum');
     socket.to(data.roomId).emit("pdfAnnotation", data);
+    console.log(`PDF annotation retransmitida para sala ${data.roomId}`);
   });
 
   socket.on("pdfAnnotationUndo", (data) => {
