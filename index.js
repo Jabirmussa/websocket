@@ -244,6 +244,23 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("slideChanged", slideIndex);
   });
 
+  // === PDF Annotations ===
+  socket.on("pdfAnnotation", (data) => {
+    console.log(`PDF annotation recebida de ${socket.id} na sala ${data.roomId}:`, data);
+    socket.to(data.roomId).emit("pdfAnnotation", data);
+    console.log(`PDF annotation retransmitida para sala ${data.roomId}`);
+  });
+
+  socket.on("pdfAnnotationUndo", (data) => {
+    console.log(`PDF annotation undo na sala ${data.roomId}`);
+    socket.to(data.roomId).emit("pdfAnnotationUndo", data);
+  });
+
+  socket.on("pdfViewportUpdate", (data) => {
+    console.log(`PDF viewport update na sala ${data.roomId}`);
+    socket.to(data.roomId).emit("pdfViewportUpdate", data);
+  });
+
   // === Desconexão ===
   socket.on("disconnect", () => {
     console.log("Cliente desconectou:", socket.id);
