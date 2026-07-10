@@ -248,7 +248,6 @@ io.on("connection", (socket) => {
   socket.on("pdfAnnotation", (data) => {
     console.log(`PDF annotation recebida de ${socket.id} na sala ${data.roomId}:`, data);
     socket.to(data.roomId).emit("pdfAnnotation", data);
-    console.log(`PDF annotation retransmitida para sala ${data.roomId}`);
   });
 
   socket.on("pdfAnnotationUndo", (data) => {
