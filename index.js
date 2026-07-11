@@ -224,6 +224,7 @@ io.on("connection", (socket) => {
         `Slides atualizados na sala ${roomId}: ${slides.length} slides, mostrando: ${showSlides}` 
       );
     }
+    
 
     io.to(roomId).emit("slidesUpdate", {
       slides,
